@@ -6,7 +6,11 @@ SET(SOURCE_DIR "src/qcqc")
 include_directories(${SOURCE_DIR})
 SET(SOURCES ${SOURCES} 
     "${SOURCE_DIR}/math.cpp"
-    "${SOURCE_DIR}/crys.cpp")
+    "${SOURCE_DIR}/cints.cpp"
+    "${SOURCE_DIR}/libint.cpp")
+
+link_directories("../../lib/libint/lib")
+link_libraries(int)
 
 SET(TEST_DIR "tests")
 SET(TESTS ${SOURCES}
