@@ -9,8 +9,11 @@ SET(SOURCES ${SOURCES}
     "${SOURCE_DIR}/cints.cpp"
     "${SOURCE_DIR}/libint.cpp")
 
-link_directories("../../lib/libint/lib")
-link_libraries(int)
+#link_directories("../../lib/libint/lib")
+#link_libraries(int)
+
+find_library(LIBINT NAMES int PATHS "../../lib/libint/lib")
+link_libraries(${LIBINT})
 
 SET(TEST_DIR "tests")
 
