@@ -13,13 +13,6 @@ link_directories("../../lib/libint/lib")
 link_libraries(int)
 
 SET(TEST_DIR "tests")
-SET(TESTS ${SOURCES}
-    "${TEST_DIR}/test_main.cpp"
-    "${TEST_DIR}/test_math.cpp")
-
-# Generate a test executable
-include_directories(lib/catch/include)
-add_executable("${PROJECT_NAME}_test" ${TESTS})
 
 # Generate python module
 add_subdirectory(lib/pybind11)
