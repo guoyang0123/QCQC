@@ -12,7 +12,7 @@ SET(SOURCES ${SOURCES}
 #link_directories("../../lib/libint/lib")
 #link_libraries(int)
 
-find_library(LIBINT NAMES int PATHS "../../lib/libint/lib")
+find_library(LIBINT NAMES int PATHS "./lib/libint/lib")
 link_libraries(${LIBINT})
 
 SET(TEST_DIR "tests")
