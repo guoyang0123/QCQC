@@ -69,10 +69,10 @@ class CMakeBuild(build_ext):
                               cwd=self.build_temp, env=env)
         subprocess.check_call(['cmake', '--build', '.'] + build_args,
                               cwd=self.build_temp)
-        # Copy *_test file to tests directory
-        test_bin = os.path.join(self.build_temp, 'qcqc_test')
-        self.copy_test_file(test_bin)
-        print()  # Add an empty line for cleaner output
+        ## Copy *_test file to tests directory
+        #test_bin = os.path.join(self.build_temp, 'qcqc_test')
+        #self.copy_test_file(test_bin)
+        #print()  # Add an empty line for cleaner output
 
     def copy_test_file(self, src_file):
         '''
