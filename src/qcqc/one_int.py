@@ -678,3 +678,76 @@ def ERI_L(c1, p1, n1, e1, am1, xyz1, c2, p2, n2, e2, am2, xyz2,
     eri = np.reshape(tmp,(nb1, nb2, nb3, nb4))
     #print(eri)
     return eri
+
+def dipole(e1,m1,xyz1,e2,m2,xyz2,xyz3,direction):
+
+    #direction is a parameter can only equal to 0,1,2 
+    m1x, m1y, m1z = m1 # shell angular momentum on Gaussian '1'
+    m2x, m2y, m2z = m2 # shell angular momentum on Gaussian '2'
+
+    P  = gaussian_product_center(e1,xyz1,e2,xyz2)
+    DX = xyz1[0]-xyz2[0]
+    DY = xyz1[1]-xyz2[1]
+    DZ = xyz1[2]-xyz2[2]
+
+    if direction == 0:
+        PQX = P[0] - xyz3[0]
+        SX  = E(e1,m1x,e2,m2x,1,DX) + PQX*E(e1,m1x,e2,m2x,0,DX)
+        #SX = E(e1,m1x,e2,m2x,1,DX) # X
+        SY  = E(e1,m1y,e2,m2y,0,DY) # Y
+        SZ  = E(e1,m1z,e2,m2z,0,DZ) # Z
+
+        return SX*SY*SZ*np.power(np.pi/(e1+e2),1.5)
+
+    elif direction == 1:
+        PQY = P[1] - xyz3[1]
+        SX  = E(e1,m1x,e2,m2x,0,DX)# X
+        SY  = E(e1,m1y,e2,m2y,1,DY) + PQY*E(e1,m1y,e2,m2y,0,DY)
+        #SY = E(e1,m1y,e2,m2y,1,DY) # Y
+        SZ  = E(e1,m1z,e2,m2z,0,DZ) # Z
+
+        return SX*SY*SZ*np.power(np.pi/(e1+e2),1.5)
+
+    elif direction == 2:
+        PQZ = P[2] - xyz3[2]
+        SX  = E(e1,m1x,e2,m2x,0,DX) # X
+        SY  = E(e1,m1y,e2,m2y,0,DY) # Y
+        SZ  = E(e1,m1z,e2,m2z,1,DZ) + PQZ*E(e1,m1z,e2,m2z,0,DZ)
+        #SZ  = E(e1,m1z,e2,m2z,1,DZ) # Z
+
+        return SX*SY*SZ*np.power(np.pi/(e1+e2),1.5)
+
+def DIP(c1, p1, n1, e1, am1, xyz1, c2, p2, n2, e2, am2, xyz2, xyz3, direction):
+    '''Evaluates dipole between two contracted Gaussians
+       over all S, P, D ... functions.
+       Arguments:
+       c1, n1, e1, am1, xyz1 : info of contracted Gaussian 1
+       c2, n2, e2, am2, xyz2 : info of contracted Gaussian 2
+       xyz3   : the center defined by users
+       p1, and p2 are normalization factor of prim Gaussian
+       of first element in the angular momentum.
+    '''
+
+    d = np.zeros(shape=(shell_to_basis(am1),shell_to_basis(am2)))
+    offi=0
+    for k1 in range(am1+1):
+        m1x=am1-k1
+        for m1z in range(k1+1):
+            m1y = k1 - m1z;
+            m1  = np.array([m1x, m1y, m1z])
+            offj=0
+            for k2 in range(am2+1):
+                m2x=am2-k2
+                for m2z in range(k2+1):
+                    m2y = k2 - m2z;
+                    m2  = np.array([m2x, m2y, m2z])
+                    for i in range(c1.shape[0]):
+                        for j in range(c2.shape[0]):
+                            d[offi][offj] += p1[i]*p2[j]*c1[i]*c2[j]*\
+                                             dipole(e1[i],m1,xyz1,e2[j],m2,xyz2,xyz3,direction)
+                    d[offi][offj]*=n1[offi]*n2[offj]
+                    offj+=1
+            offi+=1
+    return d
+
+
