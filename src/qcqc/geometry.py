@@ -8,7 +8,7 @@ import parameter
 import numpy as np
 from scipy.special import factorial2 as fact2
 from one_int import shell_to_basis
-from one_int import S, T, V, ERI, S_C, T_C, V_C, ERI_C, ERI_L 
+from one_int import S, T, V, ERI, S_C, T_C, V_C, ERI_C, ERI_L, DIP 
 from timeit import default_timer as timer
 
 class Geometry:
@@ -23,6 +23,7 @@ class Geometry:
         self.xyz    = []
         self.basis  = []
         self.nbs    = 0
+        self.enuc   = 0.0
         self.charge = int(kwargs.pop('charge',parameter._DEFAULT_CHARGE))
         self.multi  = int(kwargs.pop('multi', parameter._DEFAULT_MULTI))
         self.bsname = kwargs.pop('basisname', parameter._DEFAULT_BASIS)
@@ -41,14 +42,17 @@ class Geometry:
         self._get_S_C()
 
 
-        self._get_T()
-        self._get_T_C()
+        #self._get_T()
+        #self._get_T_C()
 
-        self._get_V()
-        self._get_V_C()
+        #self._get_V()
+        #self._get_V_C()
 
-        self._get_ERI_L()
-        self._get_ERI_C()
+        ##self._get_HCore()
+
+        #self._get_ERI_L()
+        #self._get_ERI_C()
+        #self._get_DX()
 
         return
 
@@ -62,9 +66,15 @@ class Geometry:
             self.proton.append(float(number))
             self.xyz.append(parameter._BOHR*np.array([atoms[i+1], atoms[i+2], atoms[i+3]], dtype=np.float64))
 
+        # Compute nuclear repulsion energy 
+        for i, x in enumerate(self.proton):
+            for j in range(i):
+                self.enuc += self.proton[i]*self.proton[j]/np.linalg.norm(self.xyz[i]-self.xyz[j])
+
         print("Number  Elements  (No.)         X                Y               Z")
         for id, atom in enumerate(self.elem):
             print("%6d  %5s  %6d  %16.10f %16.10f %16.10f" % (id,self.elem[id],self.proton[id],self.xyz[id][0],self.xyz[id][1],self.xyz[id][2]))
+        print("Nuclear energy=",self.enuc)
 
     def _get_all_shells(self, m):
 
@@ -83,16 +93,16 @@ class Geometry:
             sym, number, name = lut.element_data_from_sym(elem)
             bs_str = bse.get_basis(self.bsname, elements=sym, header=False)
 
-            for k, el in bs_str['basis_set_elements'].items():
+            for k, el in bs_str['elements'].items():
 
-                if not 'element_electron_shells' in el:
+                if not 'electron_shells' in el:
                     continue
 
-                for sh in el['element_electron_shells']:
-                    exponents = sh['shell_exponents']
+                for sh in el['electron_shells']:
+                    exponents = sh['exponents']
                     # transpose of the coefficient matrix
-                    coeff_t = sh['shell_coefficients']
-                    am = sh['shell_angular_momentum']
+                    coeff_t = sh['coefficients']
+                    am = sh['angular_momentum']
                     # loop over all momentum
                     for counter, value in enumerate(am):
                         # shell loop over each momentum
@@ -133,6 +143,7 @@ class Geometry:
             offi+=shell_to_basis(self.basis[i].m) 
         print("S construction from Python takes %f sec." % time) # Time in seconds
         print(s)
+        return s
 
     def _get_S_C(self):
         s = np.zeros(shape=(self.nbs,self.nbs));
@@ -249,6 +260,38 @@ class Geometry:
             offi+=shell_to_basis(self.basis[i].m)
         print("V construction from C/C++ takes %f sec" % time) # Time in seconds
         print(v)
+
+    def _get_HCore(self):
+        fcore = np.zeros(shape=(self.nbs,self.nbs));
+        xyz_all    = np.array(self.xyz)
+        proton_all = np.array(self.proton)
+        time=0.0
+        offi=0
+        for i, x in enumerate(self.basis):
+            offj=0
+            for j in range(i+1):
+                start = timer()
+                tmpv=V(self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                       self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz, xyz_all, proton_all)
+                tmpt=T(self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                       self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz)
+
+                tmpv=tmpv+tmpt
+                fcore[offi:(offi+tmpv.shape[0]), offj:(offj+tmpv.shape[1])]=tmpv
+
+                if (i!=j) :
+                    tmpt=tmpv.transpose()
+                    fcore[offj:(offj+tmpt.shape[0]), offi:(offi+tmpt.shape[1])]=tmpt
+                offj+=shell_to_basis(self.basis[j].m)
+                end = timer()
+                time+=end-start
+            offi+=shell_to_basis(self.basis[i].m)
+        del xyz_all
+        del proton_all
+        print("One-Body Fock from Python takes %f sec." % time) # Time in seconds
+        print(fcore)
+        return fcore
+
 
     def _get_ERI(self):
         eri = np.zeros(shape=(self.nbs,self.nbs,self.nbs,self.nbs));
@@ -396,7 +439,32 @@ class Geometry:
             offi+=shell_to_basis(self.basis[i].m)
         print("ERI construction from Libint takes %f sec" % time) # Time in seconds
         print(eri)
- 
+
+    def _get_DX(self):
+        xyz3=[0.0,0.0,0.0]
+        dx = np.zeros(shape=(self.nbs,self.nbs));
+        print(self.nbs)
+        time=0.0
+        offi=0
+        for i, x in enumerate(self.basis):
+            offj=0
+            for j in range(i+1):
+                start = timer()
+                tmp=DIP(self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                      self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz,xyz3, 0)
+                dx[offi:(offi+tmp.shape[0]), offj:(offj+tmp.shape[1])]=tmp
+                if (i!=j) :
+                    tmp2=tmp.transpose()
+                    dx[offj:(offj+tmp2.shape[0]), offi:(offi+tmp2.shape[1])]=tmp2
+                offj+=shell_to_basis(self.basis[j].m)
+                end = timer()
+                time+=end-start
+            offi+=shell_to_basis(self.basis[i].m)
+        print("Dipole X construction from Python takes %f sec." % time) # Time in seconds
+        print(dx)
+        return dx
+
+
 class Basis():
     """
     A class handling basis set objects
@@ -534,7 +602,7 @@ if __name__ == '__main__':
                            H  1.1 0. 0.
                            H  0. 0. 0.
                            H  2.1 1.2 0.
-                           ''',
+                            ''',
 #coor='''C       -0.558305038     -0.000000250     -2.716159087
 #H       -1.578997038     -0.008907250     -2.317139087
 #H       -0.040245038     -0.879491250     -2.317139087
