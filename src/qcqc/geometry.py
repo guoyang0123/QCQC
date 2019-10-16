@@ -27,6 +27,7 @@ class Geometry:
         self.charge = int(kwargs.pop('charge',parameter._DEFAULT_CHARGE))
         self.multi  = int(kwargs.pop('multi', parameter._DEFAULT_MULTI))
         self.bsname = kwargs.pop('basisname', parameter._DEFAULT_BASIS)
+        self.unit   = kwargs.pop('unit', parameter._DEFAULT_UNIT)
 
         start = timer()
         if coor: self._read_atoms(coor)
@@ -38,8 +39,8 @@ class Geometry:
         end = timer()
         print("assign basis", end - start) # Time in seconds
 
-        self._get_S()
-        self._get_S_C()
+        #self._get_S()
+        #self._get_S_C()
 
 
         #self._get_T()
@@ -64,7 +65,10 @@ class Geometry:
             self.elem.append(atoms[i])
             sym, number, name = lut.element_data_from_sym(atoms[i])
             self.proton.append(float(number))
-            self.xyz.append(parameter._BOHR*np.array([atoms[i+1], atoms[i+2], atoms[i+3]], dtype=np.float64))
+            if (self.unit.upper()=='BOHR'):
+                self.xyz.append(                np.array([atoms[i+1], atoms[i+2], atoms[i+3]], dtype=np.float64))
+            else:    
+                self.xyz.append(parameter._BOHR*np.array([atoms[i+1], atoms[i+2], atoms[i+3]], dtype=np.float64))
 
         # Compute nuclear repulsion energy 
         for i, x in enumerate(self.proton):
