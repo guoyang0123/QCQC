@@ -68,7 +68,7 @@ CH4 = Geometry('CH4',
                    ''',
                    charge=0,
                    multi=1,
-                   basisname='cc-pvqz',
+                   basisname='cc-pvdz',
                    unit='bohr')
 
 s = CH4._get_S()
