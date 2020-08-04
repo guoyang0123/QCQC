@@ -4,7 +4,7 @@ import copy
 sys.setrecursionlimit(100000)
 from numba import njit,jit
 from timeit import default_timer as timer
-import qcqc
+#import qcqc
 from util import Fgamma,hyp1f1_in_njit
 
 @njit('int64(int64)')
@@ -679,9 +679,9 @@ def ERI_L(c1, p1, n1, e1, am1, xyz1, c2, p2, n2, e2, am2, xyz2,
     #print(eri)
     return eri
 
+@njit
 def dipole(e1,m1,xyz1,e2,m2,xyz2,xyz3,direction):
 
-    #direction is a parameter can only equal to 0,1,2 
     m1x, m1y, m1z = m1 # shell angular momentum on Gaussian '1'
     m2x, m2y, m2z = m2 # shell angular momentum on Gaussian '2'
 
@@ -717,6 +717,7 @@ def dipole(e1,m1,xyz1,e2,m2,xyz2,xyz3,direction):
 
         return SX*SY*SZ*np.power(np.pi/(e1+e2),1.5)
 
+@njit
 def DIP(c1, p1, n1, e1, am1, xyz1, c2, p2, n2, e2, am2, xyz2, xyz3, direction):
     '''Evaluates dipole between two contracted Gaussians
        over all S, P, D ... functions.
@@ -743,7 +744,7 @@ def DIP(c1, p1, n1, e1, am1, xyz1, c2, p2, n2, e2, am2, xyz2, xyz3, direction):
                     m2  = np.array([m2x, m2y, m2z])
                     for i in range(c1.shape[0]):
                         for j in range(c2.shape[0]):
-                            d[offi][offj] += p1[i]*p2[j]*c1[i]*c2[j]*\
+                            d[offi][offj] -= p1[i]*p2[j]*c1[i]*c2[j]*\
                                              dipole(e1[i],m1,xyz1,e2[j],m2,xyz2,xyz3,direction)
                     d[offi][offj]*=n1[offi]*n2[offj]
                     offj+=1

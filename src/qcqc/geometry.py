@@ -22,7 +22,10 @@ class Geometry:
         self.proton = []
         self.xyz    = []
         self.basis  = []
+        self.shell  = []
         self.nbs    = 0
+        self.nel    = 0
+        self.nsh    = 0
         self.enuc   = 0.0
         self.charge = int(kwargs.pop('charge',parameter._DEFAULT_CHARGE))
         self.multi  = int(kwargs.pop('multi', parameter._DEFAULT_MULTI))
@@ -32,16 +35,15 @@ class Geometry:
         start = timer()
         if coor: self._read_atoms(coor)
         end = timer()
-        print("read atom",end - start) # Time in seconds        
+        #print("read atom",end - start) # Time in seconds        
 
         start = timer()
         self._assign_basis()
         end = timer()
-        print("assign basis", end - start) # Time in seconds
+        #print("assign basis", end - start) # Time in seconds
 
         #self._get_S()
         #self._get_S_C()
-
 
         #self._get_T()
         #self._get_T_C()
@@ -49,27 +51,32 @@ class Geometry:
         #self._get_V()
         #self._get_V_C()
 
-        ##self._get_HCore()
+        #self._get_HCore()
 
+        ##self._get_ERI()
+        ##self._get_ERI_C()
         #self._get_ERI_L()
-        #self._get_ERI_C()
+
         #self._get_DX()
+        #self._get_DY()
+        #self._get_DZ()
 
         return
 
     def _read_atoms(self, coor):
         atoms = coor.split()
-        #print(atoms)
         natom=len(atoms)
         for i in range(0, natom, 4):
             self.elem.append(atoms[i])
             sym, number, name = lut.element_data_from_sym(atoms[i])
             self.proton.append(float(number))
+            self.nel +=number
             if (self.unit.upper()=='BOHR'):
                 self.xyz.append(                np.array([atoms[i+1], atoms[i+2], atoms[i+3]], dtype=np.float64))
             else:    
                 self.xyz.append(parameter._BOHR*np.array([atoms[i+1], atoms[i+2], atoms[i+3]], dtype=np.float64))
 
+        self.nel -=self.charge
         # Compute nuclear repulsion energy 
         for i, x in enumerate(self.proton):
             for j in range(i):
@@ -79,16 +86,17 @@ class Geometry:
         for id, atom in enumerate(self.elem):
             print("%6d  %5s  %6d  %16.10f %16.10f %16.10f" % (id,self.elem[id],self.proton[id],self.xyz[id][0],self.xyz[id][1],self.xyz[id][2]))
         print("Nuclear energy=",self.enuc)
+        print("Num.  electron=",self.nel)
 
-    def _get_all_shells(self, m):
+    #def _get_all_shells(self, m):
 
-        momentum_string ={
-           0: [[0,0,0]],
-           1: [[1,0,0], [0,1,0], [0,0,1]],
-           2: [[2,0,0], [1,1,0], [1,0,1], [0,2,0], [0,1,1], [0,0,2]],
-           3: [[3,0,0], [2,1,0], [2,0,1], [1,2,0], [1,1,1], [1,0,2], [0,3,0], [0,2,1], [0,1,2], [0,0,3]]
-        }
-        return (momentum_string[m])
+    #    momentum_string ={
+    #       0: [[0,0,0]],
+    #       1: [[1,0,0], [0,1,0], [0,0,1]],
+    #       2: [[2,0,0], [1,1,0], [1,0,1], [0,2,0], [0,1,1], [0,0,2]],
+    #       3: [[3,0,0], [2,1,0], [2,0,1], [1,2,0], [1,1,1], [1,0,2], [0,3,0], [0,2,1], [0,1,2], [0,0,3]]
+    #    }
+    #    return (momentum_string[m])
 
     def _assign_basis(self):
 
@@ -108,6 +116,7 @@ class Geometry:
                     coeff_t = sh['coefficients']
                     am = sh['angular_momentum']
                     # loop over all momentum
+                    self.shell.append(self.nbs)
                     for counter, value in enumerate(am):
                         # shell loop over each momentum
                         #for shell in self._get_all_shells(value):
@@ -125,10 +134,14 @@ class Geometry:
                         coef= np.array(list(map(float, coeff_t[counter])))
                         self.basis.append(Basis(coef, exp, mom, xyz)) 
                         self.nbs +=shell_to_basis(mom)                     
+                    self.nsh=self.nsh+1
+        print("Num.  basisset=",self.nbs)
+        print("Num.  basshell=",self.nsh)
+        #print(self.shell)
 
     def _get_S(self):
         s = np.zeros(shape=(self.nbs,self.nbs));
-        print(self.nbs)
+        #print(self.nbs)
         time=0.0
         offi=0
         for i, x in enumerate(self.basis):
@@ -145,8 +158,7 @@ class Geometry:
                 end = timer()
                 time+=end-start
             offi+=shell_to_basis(self.basis[i].m) 
-        print("S construction from Python takes %f sec." % time) # Time in seconds
-        print(s)
+        print("Overlap  integrals from Python take %f sec." % time) # Time in seconds
         return s
 
     def _get_S_C(self):
@@ -167,8 +179,8 @@ class Geometry:
                 end = timer()
                 time+=end-start
             offi+=shell_to_basis(self.basis[i].m)
-        print("S construction from C/C++ takes %f sec" % time) # Time in seconds
-        print(s)
+        print("Overlap  integrals from C/C++  take %f sec" % time) # Time in seconds
+        return s
 
     def _get_T(self):
         t = np.zeros(shape=(self.nbs,self.nbs));
@@ -188,12 +200,11 @@ class Geometry:
                 end = timer()
                 time+=end-start
             offi+=shell_to_basis(self.basis[i].m)
-        print("T construction from Python takes %f sec." % time) # Time in seconds
-        print(t)
+        print("Kinetic  integrals from Python take %f sec." % time) # Time in seconds
+        #print(t)
 
     def _get_T_C(self):
         t = np.zeros(shape=(self.nbs,self.nbs));
-        print(self.nbs)
         time=0.0
         offi=0
         for i, x in enumerate(self.basis):
@@ -210,8 +221,8 @@ class Geometry:
                 end = timer()
                 time+=end-start
             offi+=shell_to_basis(self.basis[i].m)
-        print("T construction from C/C++ takes %f sec" % time) # Time in seconds
-        print(t)
+        print("Kinetic  integrals from C/C++  take %f sec" % time) # Time in seconds
+        return t
 
 
     def _get_V(self):
@@ -236,8 +247,8 @@ class Geometry:
             offi+=shell_to_basis(self.basis[i].m)
         del xyz_all
         del proton_all
-        print("V construction from Python takes %f sec." % time) # Time in seconds
-        print(v)
+        print("Nuc-Elec integrals from Python take %f sec." % time) # Time in seconds
+        #print(v)
 
     def _get_V_C(self):
         v = np.zeros(shape=(self.nbs,self.nbs));
@@ -262,8 +273,8 @@ class Geometry:
 
                 offj+=shell_to_basis(self.basis[j].m)
             offi+=shell_to_basis(self.basis[i].m)
-        print("V construction from C/C++ takes %f sec" % time) # Time in seconds
-        print(v)
+        print("Nuc-Elec integrals from C/C++  takes %f sec" % time) # Time in seconds
+        return v
 
     def _get_HCore(self):
         fcore = np.zeros(shape=(self.nbs,self.nbs));
@@ -292,8 +303,7 @@ class Geometry:
             offi+=shell_to_basis(self.basis[i].m)
         del xyz_all
         del proton_all
-        print("One-Body Fock from Python takes %f sec." % time) # Time in seconds
-        print(fcore)
+        print("One-body integrals from Python take %f sec." % time) # Time in seconds
         return fcore
 
 
@@ -341,8 +351,8 @@ class Geometry:
                     offk+=shell_to_basis(self.basis[k].m)
                 offj+=shell_to_basis(self.basis[j].m)
             offi+=shell_to_basis(self.basis[i].m)
-        print("ERI construction from Python takes %f sec" % time) # Time in seconds
-        print(eri)
+        print("Two-body integrals from Python take %f sec" % time) # Time in seconds
+        return eri
 
     #def _write_basis_f(self,file,i):
     #    file.write("%d  %d\n" % (self.basis[i].c.shape[0], self.basis[i].m.sum()))
@@ -394,8 +404,8 @@ class Geometry:
                     offk+=shell_to_basis(self.basis[k].m)
                 offj+=shell_to_basis(self.basis[j].m)
             offi+=shell_to_basis(self.basis[i].m)
-        print("ERI construction from C/C++ takes %f sec" % time) # Time in seconds
-        print(eri)
+        print("Two-body integrals from C/C++  take %f sec" % time) # Time in seconds
+        return eri
 
     def _get_ERI_L(self):
         eri = np.zeros(shape=(self.nbs,self.nbs,self.nbs,self.nbs));
@@ -441,13 +451,12 @@ class Geometry:
                     offk+=shell_to_basis(self.basis[k].m)
                 offj+=shell_to_basis(self.basis[j].m)
             offi+=shell_to_basis(self.basis[i].m)
-        print("ERI construction from Libint takes %f sec" % time) # Time in seconds
-        print(eri)
+        print("Two-body integrals from Libint take %f sec" % time) # Time in seconds
+        return eri
 
     def _get_DX(self):
         xyz3=[0.0,0.0,0.0]
         dx = np.zeros(shape=(self.nbs,self.nbs));
-        print(self.nbs)
         time=0.0
         offi=0
         for i, x in enumerate(self.basis):
@@ -464,10 +473,70 @@ class Geometry:
                 end = timer()
                 time+=end-start
             offi+=shell_to_basis(self.basis[i].m)
-        print("Dipole X construction from Python takes %f sec." % time) # Time in seconds
-        print(dx)
+        print("Dipole X integrals from Python take %f sec." % time) # Time in seconds
+        #print(dx)
         return dx
 
+    def _get_DY(self):
+        xyz3=[0.0,0.0,0.0]
+        dy = np.zeros(shape=(self.nbs,self.nbs));
+        time=0.0
+        offi=0
+        for i, x in enumerate(self.basis):
+            offj=0
+            for j in range(i+1):
+                start = timer()
+                tmp=DIP(self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                      self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz,xyz3, 1)
+                dy[offi:(offi+tmp.shape[0]), offj:(offj+tmp.shape[1])]=tmp
+                if (i!=j) :
+                    tmp2=tmp.transpose()
+                    dy[offj:(offj+tmp2.shape[0]), offi:(offi+tmp2.shape[1])]=tmp2
+                offj+=shell_to_basis(self.basis[j].m)
+                end = timer()
+                time+=end-start
+            offi+=shell_to_basis(self.basis[i].m)
+        print("Dipole Y integrals from Python take %f sec." % time) # Time in seconds
+        #print(dy)
+        return dy
+
+    def _get_DZ(self):
+        xyz3=[0.0,0.0,0.0]
+        dz = np.zeros(shape=(self.nbs,self.nbs));
+        time=0.0
+        offi=0
+        for i, x in enumerate(self.basis):
+            offj=0
+            for j in range(i+1):
+                start = timer()
+                tmp=DIP(self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                      self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz,xyz3, 2)
+                dz[offi:(offi+tmp.shape[0]), offj:(offj+tmp.shape[1])]=tmp
+                if (i!=j) :
+                    tmp2=tmp.transpose()
+                    dz[offj:(offj+tmp2.shape[0]), offi:(offi+tmp2.shape[1])]=tmp2
+                offj+=shell_to_basis(self.basis[j].m)
+                end = timer()
+                time+=end-start
+            offi+=shell_to_basis(self.basis[i].m)
+        print("Dipole Z integrals from Python take %f sec." % time) # Time in seconds
+        return dz
+
+    def _get_ERI_Screen(self):
+        KIJ = np.zeros(shape=(self.nbs,self.nbs));
+        time=0.0
+        for i, x in enumerate(self.basis):
+            offj=0
+            for j in range(i+1):
+                start = timer()
+                tmp1=ERI_L(self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                           self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz,
+                           self.basis[i].c, self.basis[i].p, self.basis[i].n, self.basis[i].e, self.basis[i].m, self.basis[i].xyz,
+                           self.basis[j].c, self.basis[j].p, self.basis[j].n, self.basis[j].e, self.basis[j].m, self.basis[j].xyz)
+                KIJ[i, j]=0.0
+                KIJ[j, i]=0.0
+                time+=end-start
+        print("(ij|ij)  integrals from Libint take %f sec" % time) # Time in seconds
 
 class Basis():
     """
@@ -539,85 +608,13 @@ class Basis():
 if __name__ == '__main__':
     start = timer()
     h2o = Geometry('h2o', 
-                    coor1='''O  0. 0. 0.
-                            O  1. 0. 0.
-                            O  2. 0. 0.
-                            O  3. 0. 0.
-                            O  4. 0. 0.
-                            O  5. 0. 0.
-                            O  6. 0. 0.
-                            O  7. 0. 0.
-                            O  8. 0. 0.
-                            O  9. 0. 0.
-                            O  10. 0. 0.
-                            O  1. 0. 0.
-                            O  2. 0. 0.
-                            O  3. 0. 0.
-                            O  4. 0. 0.
-                            O  5. 0. 0.
-                            O  6. 0. 0.
-                            O  7. 0. 0.
-                            O  8. 0. 0.
-                            O  9. 0. 0.
-                            O  10. 0. 0.
-                            O  1. 0. 0.
-                            O  2. 0. 0.
-                            O  3. 0. 0.
-                            O  4. 0. 0.
-                            O  5. 0. 0.
-                            O  6. 0. 0.
-                            O  7. 0. 0.
-                            O  8. 0. 0.
-                            O  9. 0. 0.
-                            O  10. 0. 0.
-                            O  1. 0. 0.
-                            O  2. 0. 0.
-                            O  3. 0. 0.
-                            O  4. 0. 0.
-                            O  5. 0. 0.
-                            O  6. 0. 0.
-                            O  7. 0. 0.
-                            O  8. 0. 0.
-                            O  9. 0. 0.
-                            O  10. 0. 0.
-                            O  10. 0. 0.
-                            O  1. 0. 0.
-                            O  2. 0. 0.
-                            O  3. 0. 0.
-                            O  4. 0. 0.
-                            O  5. 0. 0.
-                            O  6. 0. 0.
-                            O  7. 0. 0.
-                            O  8. 0. 0.
-                            O  9. 0. 0.
-                            O  10. 0. 0.
-                            O  1. 0. 0.
-                            O  2. 0. 0.
-                            O  3. 0. 0.
-                            O  4. 0. 0.
-                            O  5. 0. 0.
-                            O  6. 0. 0.
-                            O  7. 0. 0.
-                            O  8. 0. 0.
-                            O  9. 0. 0.
-                            O  10. 0. 0.
-                            O  11. 0. 0.''',
-                   coor='''H  0. 1.2 0.
-                           H  1.1 0. 0.
-                           H  0. 0. 0.
-                           H  2.1 1.2 0.
+                   coor='''O   0.000000000000  -0.143225816552   0.000000000000
+                           H   1.638036840407   1.136548822547  -0.000000000000
+                           H  -1.638036840407   1.136548822547  -0.000000000000
                             ''',
-#coor='''C       -0.558305038     -0.000000250     -2.716159087
-#H       -1.578997038     -0.008907250     -2.317139087
-#H       -0.040245038     -0.879491250     -2.317139087
-#H       -0.055673038      0.888398750     -2.317139087
-#C       -0.558305038     -0.000000250     -4.256159087
-#H        0.462386962     -0.008907250     -4.655179087
-#H       -1.076365038     -0.879491250     -4.655179087
-#H       -1.060937038      0.888398750     -4.655179087''',
-                   charge=3,
-                   multi=4,
-                   basisname='cc-pvdz')
+                   charge=0,
+                   multi=1,
+                   basisname='DZ (Dunning-Hay)', unit='bohr')
     print(h2o.charge)
     print(h2o.multi)
     end = timer()
