@@ -53,8 +53,8 @@ class Geometry:
 
         #self._get_HCore()
 
-        ##self._get_ERI()
-        ##self._get_ERI_C()
+        #self._get_ERI()
+        #self._get_ERI_C()
         #self._get_ERI_L()
 
         #self._get_DX()
@@ -107,34 +107,29 @@ class Geometry:
 
             for k, el in bs_str['elements'].items():
 
-                if not 'electron_shells' in el:
-                    continue
-
                 for sh in el['electron_shells']:
+                    #print("sh", sh)
                     exponents = sh['exponents']
                     # transpose of the coefficient matrix
                     coeff_t = sh['coefficients']
                     am = sh['angular_momentum']
                     # loop over all momentum
-                    self.shell.append(self.nbs)
                     for counter, value in enumerate(am):
+                        self.shell.append(self.nbs)
                         # shell loop over each momentum
                         #for shell in self._get_all_shells(value):
                         #assign XYZ for each shell and scale with BOHR
-                        #xyz = np.array(self.xyz[id], dtype='f')
                         xyz = np.array(self.xyz[id]) 
                         #assign angular_momentum for each shell
-                        #mom = np.array(shell, dtype=np.int32)
                         mom = int(value)
                         #assign exponents for each shell
-                        #exp = np.array(list(map(float, exponents)),dtype='f')
                         exp = np.array(list(map(float, exponents)))
-                        #assign coefficients for each shell
-                        #coef= np.array(list(map(float, coeff_t[counter])),dtype='f')
-                        coef= np.array(list(map(float, coeff_t[counter])))
-                        self.basis.append(Basis(coef, exp, mom, xyz)) 
-                        self.nbs +=shell_to_basis(mom)                     
-                    self.nsh=self.nsh+1
+                        for nn in range(0, len(coeff_t)):
+                            #assign coefficients for each shell
+                            coef= np.array(list(map(float, coeff_t[nn])))
+                            self.basis.append(Basis(coef, exp, mom, xyz)) 
+                            self.nbs +=shell_to_basis(mom)                     
+                            self.nsh=self.nsh+1
         print("Num.  basisset=",self.nbs)
         print("Num.  basshell=",self.nsh)
         #print(self.shell)
@@ -159,6 +154,7 @@ class Geometry:
                 time+=end-start
             offi+=shell_to_basis(self.basis[i].m) 
         print("Overlap  integrals from Python take %f sec." % time) # Time in seconds
+        #print(s)
         return s
 
     def _get_S_C(self):
@@ -202,6 +198,7 @@ class Geometry:
             offi+=shell_to_basis(self.basis[i].m)
         print("Kinetic  integrals from Python take %f sec." % time) # Time in seconds
         #print(t)
+        return t
 
     def _get_T_C(self):
         t = np.zeros(shape=(self.nbs,self.nbs));
@@ -304,6 +301,7 @@ class Geometry:
         del xyz_all
         del proton_all
         print("One-body integrals from Python take %f sec." % time) # Time in seconds
+        #print(fcore)
         return fcore
 
 
@@ -352,6 +350,7 @@ class Geometry:
                 offj+=shell_to_basis(self.basis[j].m)
             offi+=shell_to_basis(self.basis[i].m)
         print("Two-body integrals from Python take %f sec" % time) # Time in seconds
+        #print(eri)
         return eri
 
     #def _write_basis_f(self,file,i):
@@ -607,11 +606,11 @@ class Basis():
 
 if __name__ == '__main__':
     start = timer()
-    h2o = Geometry('h2o', 
+    h2o = Geometry('h2o',
                    coor='''O   0.000000000000  -0.143225816552   0.000000000000
                            H   1.638036840407   1.136548822547  -0.000000000000
                            H  -1.638036840407   1.136548822547  -0.000000000000
-                            ''',
+                   ''',
                    charge=0,
                    multi=1,
                    basisname='DZ (Dunning-Hay)', unit='bohr')
